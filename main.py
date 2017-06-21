@@ -17,6 +17,23 @@ class Lot(object):
         return ".{} {}.".format(self.tag, self.amt)
 
 
+class LotPool(object):
+    pool = []
+
+    @staticmethod
+    def get(tag, amt):
+        if len(LotPool.pool) > 0:
+            lot = LotPool.pool.pop()
+            lot.__init__(tag, amt)
+        else:
+            lot = Lot(tag, amt)
+        return lot
+
+    @staticmethod
+    def put(lot):
+        LotPool.pool.append(lot)
+
+
 class Slot(object):
     """
     Contains a Lot, is part of a Unit
@@ -93,7 +110,7 @@ class SlotMgr(object):
                     rx_lot = rx_slot.take()
                     # Create lots if needed
                     if rx_lot is None:
-                        rx_lot = Lot(slot.tag, 0)
+                        rx_lot = LotPool.get(slot.tag, 0)
                     # Increment lot amt
                     rx_lot.amt += div_amt
                     # Give the lot to the rx slot
@@ -103,7 +120,9 @@ class SlotMgr(object):
                 rem_amt = lot.amt % len(slot.tgt_slots)
                 # Destroy lots if no longer needed
                 if rem_amt > 0:
-                    slot.give(Lot(slot.tag, rem_amt))
+                    slot.give(LotPool.get(slot.tag, rem_amt))
+                else:
+                    LotPool.put(lot)
 
 
 class RxSlot(Slot):
@@ -173,29 +192,31 @@ class Unit(object):
 
     def tick(self, tick):
         # Start by assuming we have all the lots we need to do our recipe
-        lots_avbl = True
+        lots_ready = True
         # Now if any is insufficient, then lots are not avbl
         for slot in self.rx_slots:
             if slot.lot is None:
                 return
 
             if slot.lot.amt < slot.rcp_amt:
-                lots_avbl = False
+                lots_ready = False
 
         # If we have enough, do our recipe
-        if lots_avbl:
+        if lots_ready:
             # Nom the rx
             for slot in self.rx_slots:
                 lot = slot.take()
                 lot.amt -= slot.rcp_amt
                 if lot.amt > 0:
                     slot.give(lot)
+                else:
+                    LotPool.put(lot)
 
             # Create the tx
             for slot in self.tx_slots:
                 lot = slot.take()
                 if lot is None:
-                    lot = Lot(slot.tag, 0)
+                    lot = LotPool.get(slot.tag, 0)
                 lot.amt += slot.rcp_amt
                 slot.give(lot)
 
