@@ -193,7 +193,7 @@ class Unit(object):
     def tick(self, tick):
         # Start by assuming we have all the lots we need to do our recipe
         lots_ready = True
-        # Now if any is insufficient, then lots are not avbl
+        # Now if any is insufficient, then lots are not ready
         for slot in self.rx_slots:
             if slot.lot is None:
                 return
@@ -241,6 +241,8 @@ def run():
         SlotMgr.tick(tick)
         UnitMgr.tick(tick)
         tick += 1
+
+        # TODO: set done condition, for now, debug with breakpoint on the while loop
 
     print "K DONE"
 
