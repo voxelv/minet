@@ -80,7 +80,6 @@ class Slot(object):
 class SlotMgr(object):
     tx_slots = []
     rx_slots = []
-    on_tick = 0
 
     @staticmethod
     def add_slot(slot):
@@ -94,8 +93,7 @@ class SlotMgr(object):
             SlotMgr.rx_slots.append(slot)
 
     @staticmethod
-    def tick(tick):
-        SlotMgr.on_tick = tick
+    def tick():
 
         # TX all the TxSlot
         for slot in SlotMgr.tx_slots:
@@ -162,9 +160,9 @@ class UnitMgr(object):
             UnitMgr.units.append(unit)
 
     @staticmethod
-    def tick(tick):
+    def tick():
         for unit in UnitMgr.units:
-            unit.tick(tick)
+            unit.tick()
 
 
 class UnitRcp(object):
@@ -190,7 +188,7 @@ class Unit(object):
 
         UnitMgr.add_unit(self)
 
-    def tick(self, tick):
+    def tick(self):
         # Start by assuming we have all the lots we need to do our recipe
         lots_ready = True
         # Now if any is insufficient, then lots are not ready
@@ -227,7 +225,7 @@ class Unit(object):
 def run():
     print "K GO"
     boiler = Unit(UnitRcp([Lot("COAL", 1), Lot("WATER", 10)], [Lot("STEAM", 100)]))
-    coal_src = Unit(UnitRcp([], [Lot("COAL", 2)]))
+    coal_src = Unit(UnitRcp([], [Lot("COAL", 1)]))
     water_src = Unit(UnitRcp([], [Lot("WATER", 10)]))
     steam_sink = Unit(UnitRcp([Lot("STEAM", 100)], []))
 
@@ -235,12 +233,10 @@ def run():
     boiler.rx_slots[1].connect_to(water_src.tx_slots[0])
     boiler.tx_slots[0].connect_to(steam_sink.rx_slots[0])
 
-    tick = 0
     done = False
     while not done:
-        SlotMgr.tick(tick)
-        UnitMgr.tick(tick)
-        tick += 1
+        SlotMgr.tick()
+        UnitMgr.tick()
 
         # TODO: set done condition, for now, debug with breakpoint on the while loop
 
