@@ -173,7 +173,7 @@ class Unit(object):
 
 def run():
     print "K GO"
-    boiler = Unit(UnitRcp([Lot("COAL", 1), Lot("WATER", 10)], Lot("STEAM", 100)))
+    boiler = Unit(UnitRcp([Lot("COAL", 1), Lot("WATER", 10)], [Lot("STEAM", 100)]))
 
     print "K DONE"
 
