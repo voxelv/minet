@@ -264,9 +264,6 @@ class Unit(object):
                 lot.amt += slot.rcp_amt
                 slot.give(lot)
 
-    def connect(self, my_slot_idx, unit, unit_slot_idx):
-        self.slots[my_slot_idx].connect_to(unit.slots[unit_slot_idx])
-
     def __repr__(self):
         return "Unit: ({})".format("_" if self.rcp is None else self.rcp.name)
 
@@ -304,3 +301,7 @@ class MinetNet(object):
         self.slot_mgr.tick()
         self.unit_mgr.tick()
         self.tick_count += 1
+
+    @staticmethod
+    def connect(unit1, unit1_slot_idx, unit2, unit2_slot_idx):
+        unit1.slots[unit1_slot_idx].connect_to(unit2.slots[unit2_slot_idx])

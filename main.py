@@ -11,9 +11,9 @@ def run():
     water_pump = net.new_unit(rcp_name="Water Pump")
     steam_turbine = net.new_unit(rcp_name="Steam Turbine")
 
-    boiler.connect(0, coal_mine, 0)
-    boiler.connect(1, water_pump, 0)
-    boiler.connect(2, steam_turbine, 0)
+    net.connect(boiler, 0, coal_mine, 0)
+    net.connect(boiler, 1, water_pump, 0)
+    net.connect(boiler, 2, steam_turbine, 0)
 
     done = False
     while not done:
