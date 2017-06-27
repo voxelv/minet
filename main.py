@@ -1,5 +1,3 @@
-from math import floor
-
 
 class Lot(object):
     """
@@ -18,20 +16,36 @@ class Lot(object):
 
 
 class LotPool(object):
-    pool = []
 
-    @staticmethod
-    def get(tag, amt):
-        if len(LotPool.pool) > 0:
-            lot = LotPool.pool.pop()
+    def __init__(self):
+        """
+        A pool for Lot objects
+        """
+        self.pool = []
+
+    def get(self, tag, amt):
+        """
+        Gets a lot from the pool, or creates a new one
+        if needed.
+        :param tag: tag to set the Lot as
+        :param amt: amount to set the Lot as
+        :return: a Lot
+        :rtype: Lot
+        """
+        if len(self.pool) > 0:
+            lot = self.pool.pop()
             lot.__init__(tag, amt)
         else:
             lot = Lot(tag, amt)
         return lot
 
-    @staticmethod
-    def put(lot):
-        LotPool.pool.append(lot)
+    def put(self, lot):
+        """
+        Puts a Lot back
+        :param lot:
+        :return:
+        """
+        self.pool.append(lot)
 
 
 class Slot(object):
@@ -39,23 +53,38 @@ class Slot(object):
     Contains a Lot, is part of a Unit
     """
 
-    def __init__(self, unit, tag, rcp_amt):
-        self.unit = unit if isinstance(unit, Unit) else None
+    def __init__(self, net, unit, tag, rcp_amt):
+        """
+        Slot initializer
+        :param net: the MinetNet for this
+        :param unit: parent Unit
+        :param tag: tag for the Slot
+        :param rcp_amt: recipe amount req or mak
+        """
+        if not isinstance(net, MinetNet):
+            raise TypeError("net is not a MinetNet")
+        if not isinstance(unit, Unit):
+            raise TypeError("unit is not a Unit")
+
+        self.net = net
+        self.unit = unit
+
         self.tag = tag
         self.lot = None
 
-        self.flow = "NONE"
+        self.flow = "INVALID"
 
         self.rcp_amt = rcp_amt
 
+        # Slot connections
         self.src_slots = []
         self.tgt_slots = []
 
-        SlotMgr.add_slot(self)
+        self.net.slot_mgr.add_slot(self)
 
     def give(self, lot):
-        if lot is None or not isinstance(lot, Lot):
-            return
+        if not isinstance(lot, Lot):
+            raise TypeError("lot is not a Lot")
 
         if self.lot is None:
             self.lot = lot
@@ -78,37 +107,41 @@ class Slot(object):
 
 
 class SlotMgr(object):
-    tx_slots = []
-    rx_slots = []
 
-    @staticmethod
-    def add_slot(slot):
+    def __init__(self, net):
+        if not isinstance(net, MinetNet):
+            raise TypeError("net is not a MinetNet")
+        self.net = net
+
+        self.tx_slots = []
+        self.rx_slots = []
+
+    def add_slot(self, slot):
         if not isinstance(slot, Slot):
-            return
+            raise TypeError("slot argument is not a Slot")
 
-        if isinstance(slot, TxSlot) and slot not in SlotMgr.tx_slots:
-            SlotMgr.tx_slots.append(slot)
+        if isinstance(slot, TxSlot) and slot not in self.tx_slots:
+            self.tx_slots.append(slot)
 
-        elif isinstance(slot, RxSlot) and slot not in SlotMgr.rx_slots:
-            SlotMgr.rx_slots.append(slot)
+        elif isinstance(slot, RxSlot) and slot not in self.rx_slots:
+            self.rx_slots.append(slot)
 
-    @staticmethod
-    def tick():
+    def tick(self):
 
         # TX all the TxSlot
-        for slot in SlotMgr.tx_slots:
+        for slot in self.tx_slots:
             # Only if the TxSlot has a lot and amt
             if slot.lot is not None and slot.lot.amt > 0:
                 # Get the amt
                 lot = slot.take()
                 # Divvy among the slot targets
-                div_amt = int(floor(lot.amt / len(slot.tgt_slots)))
+                div_amt = int(lot.amt / len(slot.tgt_slots))
                 # Give to targets
                 for rx_slot in slot.tgt_slots:
                     rx_lot = rx_slot.take()
                     # Create lots if needed
                     if rx_lot is None:
-                        rx_lot = LotPool.get(slot.tag, 0)
+                        rx_lot = self.net.lot_pool.get(slot.tag, 0)
                     # Increment lot amt
                     rx_lot.amt += div_amt
                     # Give the lot to the rx slot
@@ -118,14 +151,14 @@ class SlotMgr(object):
                 rem_amt = lot.amt % len(slot.tgt_slots)
                 # Destroy lots if no longer needed
                 if rem_amt > 0:
-                    slot.give(LotPool.get(slot.tag, rem_amt))
+                    slot.give(self.net.lot_pool.get(slot.tag, rem_amt))
                 else:
-                    LotPool.put(lot)
+                    self.net.lot_pool.put(lot)
 
 
 class RxSlot(Slot):
-    def __init__(self, unit, rcp, rcp_amt):
-        super(RxSlot, self).__init__(unit, rcp, rcp_amt)
+    def __init__(self, net, unit, rcp, rcp_amt):
+        super(RxSlot, self).__init__(net, unit, rcp, rcp_amt)
         self.flow = "IN"
 
     def connect_to(self, slot):
@@ -138,8 +171,8 @@ class RxSlot(Slot):
 
 
 class TxSlot(Slot):
-    def __init__(self, unit, rcp, rcp_amt):
-        super(TxSlot, self).__init__(unit, rcp, rcp_amt)
+    def __init__(self, net, unit, rcp, rcp_amt):
+        super(TxSlot, self).__init__(net, unit, rcp, rcp_amt)
         self.flow = "OUT"
 
     def connect_to(self, slot):
@@ -152,21 +185,21 @@ class TxSlot(Slot):
 
 
 class UnitMgr(object):
-    units = []
+    def __init__(self):
+        self.units = []
 
-    @staticmethod
-    def add_unit(unit):
-        if unit not in UnitMgr.units:
-            UnitMgr.units.append(unit)
+    def add_unit(self, unit):
+        if unit not in self.units:
+            self.units.append(unit)
 
-    @staticmethod
-    def tick():
-        for unit in UnitMgr.units:
+    def tick(self):
+        for unit in self.units:
             unit.tick()
 
 
 class UnitRcp(object):
-    def __init__(self, req_lots, mak_lots):
+    def __init__(self, name, req_lots, mak_lots):
+        self.name = name
         self.req_lots = req_lots
         self.mak_lots = mak_lots
 
@@ -175,18 +208,22 @@ class UnitRcp(object):
 
 
 class Unit(object):
-    def __init__(self, rcp):
-        self.rcp = rcp if isinstance(rcp, UnitRcp) else None
+    def __init__(self, net, rcp):
+        if not isinstance(net, MinetNet):
+            raise TypeError("net is not a MinetNet")
+        if not isinstance(rcp, UnitRcp):
+            raise TypeError("rcp is not a UnitRcp")
+
+        self.net = net
+        self.rcp = rcp
 
         self.rx_slots = []
         for rcp_lot in self.rcp.req_lots:
-            self.rx_slots.append(RxSlot(self, rcp_lot.tag, rcp_lot.amt))
+            self.rx_slots.append(RxSlot(self.net, self, rcp_lot.tag, rcp_lot.amt))
 
         self.tx_slots = []
         for rcp_lot in self.rcp.mak_lots:
-            self.tx_slots.append(TxSlot(self, rcp_lot.tag, rcp_lot.amt))
-
-        UnitMgr.add_unit(self)
+            self.tx_slots.append(TxSlot(self.net, self, rcp_lot.tag, rcp_lot.amt))
 
     def tick(self):
         # Start by assuming we have all the lots we need to do our recipe
@@ -208,26 +245,53 @@ class Unit(object):
                 if lot.amt > 0:
                     slot.give(lot)
                 else:
-                    LotPool.put(lot)
+                    self.net.lot_pool.put(lot)
 
             # Create the tx
             for slot in self.tx_slots:
                 lot = slot.take()
                 if lot is None:
-                    lot = LotPool.get(slot.tag, 0)
+                    lot = self.net.lot_pool.get(slot.tag, 0)
                 lot.amt += slot.rcp_amt
                 slot.give(lot)
 
     def __repr__(self):
-        return "Unit: {}->{}".format(self.rcp.req_lots, self.rcp.mak_lots)
+        return "Unit: ({})".format("_" if self.rcp is None else self.rcp.name)
+
+
+class MinetNet(object):
+    """
+    Manages a minet
+    """
+    NULL_RCP = UnitRcp("", [], [])
+
+    def __init__(self):
+        self.lot_pool = LotPool()
+        self.unit_mgr = UnitMgr()
+        self.slot_mgr = SlotMgr(self)
+        self.tick_count = 0
+
+    def new_unit(self, rcp=None):
+        if rcp is None:
+            rcp = self.NULL_RCP
+
+        unit = Unit(self, rcp)
+        self.unit_mgr.add_unit(unit)
+        return unit
+
+    def tick(self):
+        self.slot_mgr.tick()
+        self.unit_mgr.tick()
+        self.tick_count += 1
 
 
 def run():
     print "K GO"
-    boiler = Unit(UnitRcp([Lot("COAL", 1), Lot("WATER", 10)], [Lot("STEAM", 100)]))
-    coal_src = Unit(UnitRcp([], [Lot("COAL", 1)]))
-    water_src = Unit(UnitRcp([], [Lot("WATER", 10)]))
-    steam_sink = Unit(UnitRcp([Lot("STEAM", 100)], []))
+    net = MinetNet()
+    boiler = net.new_unit(UnitRcp("Boiler", [Lot("COAL", 1), Lot("WATER", 10)], [Lot("STEAM", 100)]))
+    coal_src = net.new_unit(UnitRcp("CoalMiner", [], [Lot("COAL", 1)]))
+    water_src = net.new_unit(UnitRcp("WaterPump", [], [Lot("WATER", 10)]))
+    steam_sink = net.new_unit(UnitRcp("SteamTurbine", [Lot("STEAM", 100)], []))
 
     boiler.rx_slots[0].connect_to(coal_src.tx_slots[0])
     boiler.rx_slots[1].connect_to(water_src.tx_slots[0])
@@ -235,9 +299,7 @@ def run():
 
     done = False
     while not done:
-        SlotMgr.tick()
-        UnitMgr.tick()
-
+        net.tick()
         # TODO: set done condition, for now, debug with breakpoint on the while loop
 
     print "K DONE"
