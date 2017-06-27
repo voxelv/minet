@@ -220,29 +220,32 @@ class Unit(object):
         self.net = net
         self.rcp = rcp
 
-        self.rx_slots = []
-        for rcp_lot in self.rcp.req_lots:
-            self.rx_slots.append(RxSlot(self.net, self, rcp_lot.tag, rcp_lot.amt))
+        self.slots = {}
 
-        self.tx_slots = []
+        count = 0
+        for rcp_lot in self.rcp.req_lots:
+            self.slots[count] = RxSlot(self.net, self, rcp_lot.tag, rcp_lot.amt)
+            count += 1
+
         for rcp_lot in self.rcp.mak_lots:
-            self.tx_slots.append(TxSlot(self.net, self, rcp_lot.tag, rcp_lot.amt))
+            self.slots[count] = TxSlot(self.net, self, rcp_lot.tag, rcp_lot.amt)
 
     def tick(self):
         # Start by assuming we have all the lots we need to do our recipe
         lots_ready = True
         # Now if any is insufficient, then lots are not ready
-        for slot in self.rx_slots:
-            if slot.lot is None:
-                return
-
-            if slot.lot.amt < slot.rcp_amt:
+        for slot in self.slots.itervalues():
+            if slot.flow == "IN" and (slot.lot is None or slot.lot.amt < slot.rcp_amt):
                 lots_ready = False
 
         # If we have enough, do our recipe
         if lots_ready:
             # Nom the rx
-            for slot in self.rx_slots:
+            for slot in self.slots.itervalues():
+                # Skip TxSlots
+                if slot.flow == "OUT":
+                    continue
+
                 lot = slot.take()
                 lot.amt -= slot.rcp_amt
                 if lot.amt > 0:
@@ -251,12 +254,18 @@ class Unit(object):
                     self.net.lot_pool.put(lot)
 
             # Create the tx
-            for slot in self.tx_slots:
+            for slot in self.slots.itervalues():
+                # Skip RxSlots
+                if slot.flow == "IN":
+                    continue
                 lot = slot.take()
                 if lot is None:
                     lot = self.net.lot_pool.get(slot.tag, 0)
                 lot.amt += slot.rcp_amt
                 slot.give(lot)
+
+    def connect(self, my_slot_idx, unit, unit_slot_idx):
+        self.slots[my_slot_idx].connect_to(unit.slots[unit_slot_idx])
 
     def __repr__(self):
         return "Unit: ({})".format("_" if self.rcp is None else self.rcp.name)
