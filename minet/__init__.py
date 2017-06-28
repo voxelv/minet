@@ -189,15 +189,26 @@ class TxSlot(Slot):
 
 class UnitMgr(object):
     def __init__(self):
-        self.units = []
+        self.units = {}
+        self.count = 0
 
     def add_unit(self, unit):
-        if unit not in self.units:
-            self.units.append(unit)
+        if unit not in self.units.itervalues():
+            tmp = self.count
+            self.count += 1
+            self.units[tmp] = unit
+            return tmp
+        return -1
 
     def tick(self):
-        for unit in self.units:
+        for unit in self.units.itervalues():
             unit.tick()
+
+    def get_unit(self, idx):
+        return self.units.get(idx, None)
+
+    def del_unit(self, idx):
+        self.units.pop(idx, None)
 
 
 class UnitRcp(object):
@@ -294,14 +305,15 @@ class MinetNet(object):
             rcp = UnitRcp(rcp_name, req_lots, mak_lots)
 
         unit = Unit(self, rcp)
-        self.unit_mgr.add_unit(unit)
-        return unit
+        idx = self.unit_mgr.add_unit(unit)
+        return idx
 
     def tick(self):
         self.slot_mgr.tick()
         self.unit_mgr.tick()
         self.tick_count += 1
 
-    @staticmethod
-    def connect(unit1, unit1_slot_idx, unit2, unit2_slot_idx):
-        unit1.slots[unit1_slot_idx].connect_to(unit2.slots[unit2_slot_idx])
+    def connect(self, unit1_idx, unit1_slot_idx, unit2_idx, unit2_slot_idx):
+        unit1_slot = self.unit_mgr.get_unit(unit1_idx).slots[unit1_slot_idx]
+        unit2_slot = self.unit_mgr.get_unit(unit2_idx).slots[unit2_slot_idx]
+        unit1_slot.connect_to(unit2_slot)
