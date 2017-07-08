@@ -1,5 +1,5 @@
 
-from minet import *
+from minet import MinetNet
 
 
 def run():
@@ -18,7 +18,11 @@ def run():
     done = False
     while not done:
         net.tick()
-        # TODO: set done condition, for now, debug with breakpoint on the while loop
+        """ TODO: 
+            set done condition.
+            for now, debug with breakpoint on the while loop otherwise the loop runs quite fast
+            and there's no interesting output...
+        """
 
     print "K DONE"
 
