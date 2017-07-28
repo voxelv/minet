@@ -29,7 +29,16 @@ rcps = {
             ("STEAM", 100)
         ],
         "mak": [
-            ("POWER", 100)
+            ("POWER", 100000)
         ]
-    }
+    },
+
+    "Gook Fabricator": {
+        "req": [
+            ("POWER", 3)
+        ],
+        "mak": [
+            ("GOOK", 3)
+        ]
+    },
 }

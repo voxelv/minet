@@ -165,12 +165,13 @@ class RxSlot(Slot):
         self.flow = "IN"
 
     def connect_to(self, slot):
+        connection_successful = False
         if isinstance(slot, TxSlot) and self not in slot.tgt_slots and slot not in self.src_slots:
-            slot.tgt_slots.append(self)
-            self.src_slots.append(slot)
-            return True
-
-        return False
+            if slot.tag == self.tag:
+                slot.tgt_slots.append(self)
+                self.src_slots.append(slot)
+                connection_successful = True
+        return connection_successful
 
 
 class TxSlot(Slot):
@@ -179,12 +180,13 @@ class TxSlot(Slot):
         self.flow = "OUT"
 
     def connect_to(self, slot):
+        connection_successful = False
         if isinstance(slot, RxSlot) and self not in slot.src_slots and slot not in self.tgt_slots:
-            slot.src_slots.append(self)
-            self.tgt_slots.append(slot)
-            return True
-
-        return False
+            if slot.tag == self.tag:
+                slot.src_slots.append(self)
+                self.tgt_slots.append(slot)
+                connection_successful = True
+        return connection_successful
 
 
 class UnitMgr(object):
@@ -240,6 +242,7 @@ class Unit(object):
 
         for rcp_lot in self.rcp.mak_lots:
             self.slots[count] = TxSlot(self.net, self, rcp_lot.tag, rcp_lot.amt)
+            count += 1
 
     def tick(self):
         # Start by assuming we have all the lots we need to do our recipe
@@ -316,4 +319,6 @@ class MinetNet(object):
     def connect(self, unit1_idx, unit1_slot_idx, unit2_idx, unit2_slot_idx):
         unit1_slot = self.unit_mgr.get_unit(unit1_idx).slots[unit1_slot_idx]
         unit2_slot = self.unit_mgr.get_unit(unit2_idx).slots[unit2_slot_idx]
-        unit1_slot.connect_to(unit2_slot)
+        connection_successful = unit1_slot.connect_to(unit2_slot)
+        if not connection_successful:
+            print "error connecting units"
